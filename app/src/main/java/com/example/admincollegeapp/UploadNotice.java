@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -14,8 +15,10 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.database.DatabaseReference;
@@ -26,14 +29,18 @@ import com.google.firebase.storage.UploadTask;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 
 public class UploadNotice extends AppCompatActivity {
 private  CardView addImage;
 private EditText noticeTitle;
 private Button uploadNoticeBtn;
 private ImageView noticeImageView;
+String downloadUrl ="";
 private DatabaseReference reference;
 private StorageReference storageReference;
+private ProgressDialog pd;
 
 private Bitmap bitmap;
 private final int REQ =1;
@@ -48,6 +55,7 @@ private final int REQ =1;
         noticeImageView= findViewById(R.id.noticeImageView);
         uploadNoticeBtn = findViewById(R.id.uploadNoticeBtn);
         noticeTitle = findViewById(R.id.noticeTitle);
+        pd = new ProgressDialog(this);
         addImage.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -73,6 +81,8 @@ private final int REQ =1;
     }
 
     private void uploadImage() {
+        pd.setMessage("Uploading....");
+        pd.show();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.JPEG, 50, baos);
         byte[] finalimg = baos.toByteArray();
@@ -89,11 +99,15 @@ private final int REQ =1;
                             filepath.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
                                 @Override
                                 public void onSuccess(Uri uri) {
-                                    []
+                                    downloadUrl = String.valueOf(uri);
+                                    uploadData();
                                 }
-                            })
+                            });
                         }
-                    })
+                    });
+                } else{
+                    pd.dismiss();
+                    Toast.makeText(UploadNotice.this, "Something went wrong", Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -101,7 +115,36 @@ private final int REQ =1;
     }
 
     private void uploadData() {
-        
+
+        reference = reference.child("Notice");
+        final  String uniqueKey     = reference.push().getKey();
+
+        String title = noticeTitle.getText().toString();
+
+        Calendar calForDate = Calendar.getInstance();
+        SimpleDateFormat currentDate = new SimpleDateFormat("dd--MM--yyyy");
+        String date = currentDate.format(calForDate.getTime());
+
+        Calendar calForTime = Calendar.getInstance();
+        SimpleDateFormat currentTime = new SimpleDateFormat("hh:mm a");
+        String time = currentTime.format(calForTime.getTime());
+
+        NoticeData noticeData = new NoticeData(title,downloadUrl,date,time,uniqueKey);
+
+        reference.child(uniqueKey).setValue(noticeData).addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void unused) {
+                pd.dismiss();
+                Toast.makeText(UploadNotice.this, "Notice Uploaded", Toast.LENGTH_SHORT).show();
+
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                pd.dismiss();
+                Toast.makeText(UploadNotice.this, "Something went wrong", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void openGallery() {
